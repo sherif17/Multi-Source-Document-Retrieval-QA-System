@@ -1,0 +1,49 @@
+{
+  "queries": [
+    {
+      "id": "Q1",
+      "query": "For client Aurora Paints, what is the maximum lead content allowed in the finished EcoSafe Interior Wall Paint for the EU?",
+      "expected_route": "structured_only",
+      "expected_client": "aurora",
+      "expected_answer_contains": ["lead", "EcoSafe Interior Wall Paint", "EU"],
+      "expected_source": "aurora_product_data.xlsx",
+      "notes": "Direct lookup from XLSX. Aurora has max_lead_content and max_voc_content parameters."
+    },
+    {
+      "id": "Q2",
+      "query": "For client Aurora Paints, considering EcoSafe Ceiling Paint, EcoSafe Exterior Facade and EcoShield Floor Coating in the EU, what is the maximum internal VOC limit in g/L across these products?",
+      "expected_route": "structured_only",
+      "expected_client": "aurora",
+      "expected_answer_contains": ["VOC", "g/L"],
+      "expected_source": "aurora_product_data.xlsx",
+      "notes": "Aggregation query: MAX(value) across 3 products for max_voc_content in EU."
+    },
+    {
+      "id": "Q3",
+      "query": "According to the guidance for client Horizon Coatings' UltraSafe Interior Wall Paint, in which types of rooms is enhanced ventilation or longer airing-out periods specifically recommended?",
+      "expected_route": "unstructured_only",
+      "expected_client": "horizon",
+      "expected_answer_contains": ["ventilation"],
+      "expected_source": "horizon_product_brief.docx",
+      "notes": "Narrative retrieval from DOCX paragraph about ventilation guidance."
+    },
+    {
+      "id": "Q4",
+      "query": "Comparing client Aurora Paints and client Horizon Coatings, which client sets a stricter VOC limit for interior wall paint in the EU, and what additional usage guidance is mentioned for sensitive environments across their products?",
+      "expected_route": "cross_client_hybrid",
+      "expected_client": ["aurora", "horizon"],
+      "expected_answer_contains": ["VOC", "interior wall paint"],
+      "expected_source": ["aurora_product_data.xlsx", "horizon_product_data.xlsx"],
+      "notes": "Cross-client comparison of VOC limits for interior wall paint in EU, plus narrative guidance."
+    },
+    {
+      "id": "Q5",
+      "query": "For client Aurora Paints, what internal VOC limit in g/L is set for EcoSafe Kitchen & Bath in the EU for typical residential projects?",
+      "expected_route": "hybrid_sql_primary",
+      "expected_client": "aurora",
+      "expected_answer_contains": ["g/L", "Kitchen & Bath"],
+      "expected_source": ["aurora_product_data.xlsx", "aurora_product_brief.docx"],
+      "notes": "Hybrid: VOC value from XLSX, 'typical residential' context from DOCX narrative."
+    }
+  ]
+}
