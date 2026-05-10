@@ -510,6 +510,102 @@ def guardrails_checker(state: GraphState) -> dict[str, Any]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# NODE 9: CONVERSATIONAL RESPONDER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_CONVERSATIONAL_SYSTEM = (
+    "You are a friendly Document Retrieval QA assistant that helps users "
+    "query product specifications for paint industry clients (Aurora Paints, Horizon Coatings). "
+    "You can answer questions about VOC limits, lead content, drying times, regional regulations, and more.\n\n"
+    "Respond naturally to the user's message. Keep it brief (2-4 sentences). "
+    "If it's a greeting or introduction, suggest 1-2 example questions they could ask. "
+    "Use markdown formatting.\n\n"
+    "IMPORTANT: Always respond in the same language the user writes in. "
+    "If they write in Dutch, reply in Dutch. If German, reply in German. And so on.\n\n"
+    "CONVERSATION HISTORY:\n{chat_history}"
+)
+
+
+def conversational_responder(state: GraphState) -> dict[str, Any]:
+    """
+    Handle conversational messages (greetings, thanks, chitchat) without retrieval.
+
+    Uses gpt-4o-mini with chat history for context-aware responses.
+    """
+    start = time.time()
+    query = state.get("reformulated_query", state["query"])
+    chat_history = _format_chat_history(state.get("chat_history", []))
+
+    try:
+        client = openai.OpenAI(api_key=settings.openai_api_key, timeout=15.0)
+        response = client.chat.completions.create(
+            model=settings.routing_model,
+            messages=[
+                {"role": "system", "content": _CONVERSATIONAL_SYSTEM.format(chat_history=chat_history)},
+                {"role": "user", "content": query},
+            ],
+            temperature=0.7,
+            max_tokens=250,
+        )
+        answer = response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"Conversational responder failed: {e}")
+        answer = "Hello! I'm your Document Retrieval QA assistant. Ask me anything about product specifications."
+
+    duration = (time.time() - start) * 1000
+
+    return {
+        "answer": answer,
+        "sql_results": [],
+        "vector_results": [],
+        "formatted_sql": "",
+        "formatted_vector": "",
+        "sources": [],
+        "retrieval_trace": state.get("retrieval_trace", []) + [
+            {
+                "node": "conversational_responder",
+                "action": f"Conversational response ({duration:.0f}ms)",
+                "duration_ms": duration,
+                "result_count": 0,
+                "detail": None,
+            }
+        ],
+    }
+
+
+def stream_conversational(state: dict):
+    """
+    Stream a conversational response token-by-token (for the streaming UI path).
+
+    Used when the retrieval-only workflow routes to conversational —
+    synthesis is handled here instead of stream_synthesis.
+    """
+    query = state.get("reformulated_query", state.get("query", ""))
+    chat_history = _format_chat_history(state.get("chat_history", []))
+
+    try:
+        client = openai.OpenAI(api_key=settings.openai_api_key)
+        stream = client.chat.completions.create(
+            model=settings.routing_model,
+            messages=[
+                {"role": "system", "content": _CONVERSATIONAL_SYSTEM.format(chat_history=chat_history)},
+                {"role": "user", "content": query},
+            ],
+            temperature=0.7,
+            max_tokens=250,
+            stream=True,
+        )
+
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+    except Exception as e:
+        logger.error(f"Streaming conversational failed: {e}")
+        yield "Hello! I'm your Document Retrieval QA assistant. Ask me anything about product specifications."
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # UTILITIES
 # ═══════════════════════════════════════════════════════════════════════════════
 

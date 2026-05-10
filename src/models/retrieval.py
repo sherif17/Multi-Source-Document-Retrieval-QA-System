@@ -10,13 +10,14 @@ from pydantic import BaseModel, Field
 class RouteDecision(BaseModel):
     """Output of the LLM query router — determines retrieval strategy."""
 
-    intent: Literal["lookup", "aggregation", "narrative", "comparison", "hybrid"]
+    intent: Literal["lookup", "aggregation", "narrative", "comparison", "hybrid", "conversational"]
     strategy: Literal[
         "structured_only",
         "unstructured_only",
         "hybrid_sql_primary",
         "hybrid_vec_primary",
         "cross_client_hybrid",
+        "conversational",
     ]
     clients: list[str]
     reasoning: str

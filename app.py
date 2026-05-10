@@ -379,105 +379,75 @@ elif page == "Chat":
     else:
         user_input = st.chat_input("Ask a question about product specifications...")
 
-    # ── Greeting / Chitchat Detection ──
-    _GREETINGS = {"hi", "hello", "hey", "howdy", "greetings", "good morning",
-                  "good afternoon", "good evening", "whats up", "what's up",
-                  "sup", "yo", "hola", "hi there", "hello there", "hey there",
-                  "thanks", "thank you", "bye", "goodbye", "ok", "okay",
-                  "who are you", "what can you do", "help"}
-
-    _GREETING_SYSTEM = (
-        "You are a friendly Document Retrieval QA assistant that helps users "
-        "query product specifications for paint industry clients (Aurora Paints, Horizon Coatings). "
-        "You can answer questions about VOC limits, lead content, drying times, regional regulations, and more.\n\n"
-        "Respond naturally to the user's message. Keep it brief (2-4 sentences). "
-        "Suggest 1-2 example questions they could ask. Use markdown formatting."
-    )
-
     # ── Query Processing ──
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        # Handle greetings/chitchat via lightweight LLM call (no retrieval pipeline)
-        if user_input.strip().lower().rstrip("!?.,") in _GREETINGS:
-            with st.chat_message("assistant"):
-                import openai as _oai
-                from src.config import settings as _cfg
-                _client = _oai.OpenAI(api_key=_cfg.openai_api_key)
-                _stream = _client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": _GREETING_SYSTEM},
-                        {"role": "user", "content": user_input},
-                    ],
-                    temperature=0.7,
-                    max_tokens=200,
-                    stream=True,
-                )
-                greeting_answer = st.write_stream(
-                    chunk.choices[0].delta.content
-                    for chunk in _stream
-                    if chunk.choices[0].delta.content
-                )
-            st.session_state.messages.append({"role": "assistant", "content": greeting_answer})
-        else:
-            with st.chat_message("assistant"):
-                status_placeholder = st.empty()
+        with st.chat_message("assistant"):
+            status_placeholder = st.empty()
 
-                try:
-                    from langchain_core.messages import AIMessage, HumanMessage
-                    from src.graph.nodes import stream_synthesis
+            try:
+                from langchain_core.messages import AIMessage, HumanMessage
+                from src.graph.nodes import stream_synthesis, stream_conversational
 
-                    # Phase 1: Routing & Retrieval with live progress
-                    _NODE_LABELS = {
-                        "query_analyzer": "Analyzing query...",
-                        "pre_router": "Extracting signals...",
-                        "llm_router": "Routing to retriever...",
-                        "structured_retriever": "Querying database...",
-                        "unstructured_retriever": "Searching documents...",
-                        "hybrid_retriever": "Hybrid retrieval (SQL + vector)...",
-                    }
+                # Phase 1: Routing & Retrieval with live progress
+                _NODE_LABELS = {
+                    "query_analyzer": "Analyzing query...",
+                    "pre_router": "Extracting signals...",
+                    "llm_router": "Routing to retriever...",
+                    "structured_retriever": "Querying database...",
+                    "unstructured_retriever": "Searching documents...",
+                    "hybrid_retriever": "Hybrid retrieval (SQL + vector)...",
+                    "conversational_responder": "Responding...",
+                }
 
-                    retrieval_result = {}
-                    for event in workflow.stream(
-                        {
-                            "query": user_input,
-                            "chat_history": st.session_state.chat_history,
-                            "session_id": "streamlit_session",
-                            "retrieval_trace": [],
-                            "retry_count": 0,
-                            "needs_fallback": False,
-                        },
-                        stream_mode="updates",
-                    ):
-                        # event is {node_name: state_update}
-                        for node_name, state_update in event.items():
-                            label = _NODE_LABELS.get(node_name, f"{node_name}...")
-                            # Show progress with result info
-                            detail = ""
-                            if node_name == "llm_router" and state_update.get("route"):
-                                detail = f" > `{state_update['route']}`"
-                            elif node_name in ("structured_retriever", "hybrid_retriever"):
-                                rows = len(state_update.get("sql_results", []))
-                                vecs = len(state_update.get("vector_results", []))
-                                if rows or vecs:
-                                    detail = f" > {rows} rows, {vecs} docs"
-                            elif node_name == "unstructured_retriever":
-                                vecs = len(state_update.get("vector_results", []))
-                                detail = f" > {vecs} results"
+                retrieval_result = {}
+                is_conversational = False
+                for event in workflow.stream(
+                    {
+                        "query": user_input,
+                        "chat_history": st.session_state.chat_history,
+                        "session_id": "streamlit_session",
+                        "retrieval_trace": [],
+                        "retry_count": 0,
+                        "needs_fallback": False,
+                    },
+                    stream_mode="updates",
+                ):
+                    # event is {node_name: state_update}
+                    for node_name, state_update in event.items():
+                        label = _NODE_LABELS.get(node_name, f"{node_name}...")
+                        # Show progress with result info
+                        detail = ""
+                        if node_name == "llm_router" and state_update.get("route"):
+                            detail = f" > `{state_update['route']}`"
+                        elif node_name in ("structured_retriever", "hybrid_retriever"):
+                            rows = len(state_update.get("sql_results", []))
+                            vecs = len(state_update.get("vector_results", []))
+                            if rows or vecs:
+                                detail = f" > {rows} rows, {vecs} docs"
+                        elif node_name == "unstructured_retriever":
+                            vecs = len(state_update.get("vector_results", []))
+                            detail = f" > {vecs} results"
+                        elif node_name == "conversational_responder":
+                            is_conversational = True
 
-                            status_placeholder.markdown(f"*{label}{detail}*")
-                            retrieval_result.update(state_update)
+                        status_placeholder.markdown(f"*{label}{detail}*")
+                        retrieval_result.update(state_update)
 
-                    # Clear status before streaming answer
-                    status_placeholder.empty()
+                # Clear status before streaming answer
+                status_placeholder.empty()
 
-                    # Phase 2: Stream synthesis token-by-token from OpenAI
+                # Phase 2: Stream response
+                if is_conversational:
+                    answer = st.write_stream(stream_conversational(retrieval_result))
+                else:
                     answer = st.write_stream(stream_synthesis(retrieval_result))
 
-                    # Store metadata for panels
+                # Store metadata panels (only meaningful for data queries)
+                if not is_conversational:
                     st.session_state.last_trace = retrieval_result.get("retrieval_trace", [])
                     st.session_state.last_sources = retrieval_result.get("sources", [])
                     st.session_state.last_route_info = {
@@ -488,23 +458,23 @@ elif page == "Chat":
                         "clients": retrieval_result.get("extracted_clients", []),
                     }
 
-                    # Update conversation history
-                    st.session_state.messages.append({"role": "assistant", "content": answer})
-                    st.session_state.chat_history.append(HumanMessage(content=user_input))
-                    st.session_state.chat_history.append(AIMessage(content=answer))
+                # Update conversation history (both paths)
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+                st.session_state.chat_history.append(HumanMessage(content=user_input))
+                st.session_state.chat_history.append(AIMessage(content=answer))
 
-                    # Trim history window
-                    from src.config import settings
-                    max_window = settings.chat_history_window
-                    if len(st.session_state.chat_history) > max_window:
-                        st.session_state.chat_history = st.session_state.chat_history[-max_window:]
+                # Trim history window
+                from src.config import settings
+                max_window = settings.chat_history_window
+                if len(st.session_state.chat_history) > max_window:
+                    st.session_state.chat_history = st.session_state.chat_history[-max_window:]
 
-                except Exception as e:
-                    status_placeholder.empty()
-                    error_msg = f"An error occurred: {str(e)}"
-                    st.error(error_msg)
-                    logger.error(f"Workflow error: {e}", exc_info=True)
-                    st.session_state.messages.append({"role": "assistant", "content": error_msg})
+            except Exception as e:
+                status_placeholder.empty()
+                error_msg = f"An error occurred: {str(e)}"
+                st.error(error_msg)
+                logger.error(f"Workflow error: {e}", exc_info=True)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
     # ── Information Panels ──
     if st.session_state.last_route_info or st.session_state.last_trace:

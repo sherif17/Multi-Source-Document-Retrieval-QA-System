@@ -20,20 +20,23 @@ You have access to TWO data stores:
    Best for: "what guidance says", "recommendations for", "summarize the policy", qualitative information
 
 ROUTING RULES:
+- Query is a greeting, chitchat, thank you, goodbye, "who are you", or any NON-data message → conversational
+- Query is a follow-up like "ok", "got it", "tell me more" with NO specific data question → conversational
 - Query asks for a specific numeric value (limit, content, threshold) → structured_only
 - Query asks about guidance, recommendations, considerations, or policy → unstructured_only
 - Query needs BOTH a numeric value AND contextual narrative → hybrid_sql_primary
 - Query compares across two clients → cross_client_hybrid
-- If uncertain, prefer hybrid_sql_primary (over-retrieval is safer than under-retrieval)
+- If uncertain between data routes, prefer hybrid_sql_primary (over-retrieval is safer than under-retrieval)
+- IMPORTANT: Any message in ANY language (Dutch, German, Arabic, French, etc.) that is conversational should still be routed as conversational
 
 PRE-ROUTE SIGNALS (from deterministic analysis):
 {pre_route_signals}
 
 Respond with a JSON object matching this exact schema:
 {{
-    "intent": "lookup|aggregation|narrative|comparison|hybrid",
-    "strategy": "structured_only|unstructured_only|hybrid_sql_primary|hybrid_vec_primary|cross_client_hybrid",
-    "clients": ["aurora"] or ["aurora", "horizon"],
+    "intent": "lookup|aggregation|narrative|comparison|hybrid|conversational",
+    "strategy": "structured_only|unstructured_only|hybrid_sql_primary|hybrid_vec_primary|cross_client_hybrid|conversational",
+    "clients": ["aurora"] or ["aurora", "horizon"] or [],
     "reasoning": "1-2 sentence explanation of why this route was chosen",
     "confidence": 0.0 to 1.0,
     "sub_queries": ["decomposed sub-query 1", "sub-query 2"] or [],

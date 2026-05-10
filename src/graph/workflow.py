@@ -17,6 +17,7 @@ from src.utils.logger import logger
 
 from .nodes import (
     answer_synthesizer,
+    conversational_responder,
     guardrails_checker,
     hybrid_retriever,
     llm_router,
@@ -38,6 +39,7 @@ def route_to_retriever(state: GraphState) -> str:
     After llm_router: select which retriever node to invoke.
 
     Logic:
+    - conversational → conversational_responder (no DB needed)
     - Low confidence (< 0.5) → hybrid (safe fallback)
     - structured_only → structured_retriever
     - unstructured_only → unstructured_retriever
@@ -45,6 +47,10 @@ def route_to_retriever(state: GraphState) -> str:
     """
     confidence = state.get("route_confidence", 0.5)
     strategy = state.get("route", "hybrid_sql_primary")
+
+    if strategy == "conversational":
+        logger.info("Conversational route → skipping retrieval")
+        return "conversational_responder"
 
     if confidence < 0.5:
         logger.info("Low confidence routing → defaulting to hybrid retriever")
@@ -95,6 +101,7 @@ def build_graph() -> StateGraph:
     graph.add_node("structured_retriever", structured_retriever)
     graph.add_node("unstructured_retriever", unstructured_retriever)
     graph.add_node("hybrid_retriever", hybrid_retriever)
+    graph.add_node("conversational_responder", conversational_responder)
     graph.add_node("answer_synthesizer", answer_synthesizer)
     graph.add_node("guardrails_checker", guardrails_checker)
 
@@ -103,7 +110,7 @@ def build_graph() -> StateGraph:
     graph.add_edge("query_analyzer", "pre_router")
     graph.add_edge("pre_router", "llm_router")
 
-    # Conditional: llm_router → retriever selection
+    # Conditional: llm_router → retriever selection (or conversational)
     graph.add_conditional_edges(
         "llm_router",
         route_to_retriever,
@@ -111,6 +118,7 @@ def build_graph() -> StateGraph:
             "structured_retriever": "structured_retriever",
             "unstructured_retriever": "unstructured_retriever",
             "hybrid_retriever": "hybrid_retriever",
+            "conversational_responder": "conversational_responder",
         },
     )
 
@@ -118,6 +126,9 @@ def build_graph() -> StateGraph:
     graph.add_edge("structured_retriever", "answer_synthesizer")
     graph.add_edge("unstructured_retriever", "answer_synthesizer")
     graph.add_edge("hybrid_retriever", "answer_synthesizer")
+
+    # Conversational → END (no synthesis or guardrails needed)
+    graph.add_edge("conversational_responder", END)
 
     # Synthesis → guardrails
     graph.add_edge("answer_synthesizer", "guardrails_checker")
@@ -177,6 +188,7 @@ def build_retrieval_graph() -> StateGraph:
     graph.add_node("structured_retriever", structured_retriever)
     graph.add_node("unstructured_retriever", unstructured_retriever)
     graph.add_node("hybrid_retriever", hybrid_retriever)
+    graph.add_node("conversational_responder", conversational_responder)
 
     graph.set_entry_point("query_analyzer")
     graph.add_edge("query_analyzer", "pre_router")
@@ -189,13 +201,15 @@ def build_retrieval_graph() -> StateGraph:
             "structured_retriever": "structured_retriever",
             "unstructured_retriever": "unstructured_retriever",
             "hybrid_retriever": "hybrid_retriever",
+            "conversational_responder": "conversational_responder",
         },
     )
 
-    # All retrievers → END (no synthesis)
+    # All retrievers → END (no synthesis in this workflow)
     graph.add_edge("structured_retriever", END)
     graph.add_edge("unstructured_retriever", END)
     graph.add_edge("hybrid_retriever", END)
+    graph.add_edge("conversational_responder", END)
 
     return graph
 
