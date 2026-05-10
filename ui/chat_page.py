@@ -66,19 +66,63 @@ def render_chat_page(workflow):
 
 
 def _render_example_queries():
-    """Show expandable example queries."""
+    """Show expandable example queries organized by language tabs."""
     with st.expander("Example Queries", expanded=False):
-        examples = [
-            "For client Aurora Paints, what is the maximum lead content allowed in EcoSafe Interior Wall Paint for the EU?",
-            "For client Aurora Paints, considering EcoSafe Ceiling Paint, EcoSafe Exterior Facade and EcoShield Floor Coating in the EU, what is the maximum internal VOC limit in g/L across these products?",
-            "According to the guidance for client Horizon Coatings' UltraSafe Interior Wall Paint, in which types of rooms is enhanced ventilation recommended?",
-            "Comparing Aurora Paints and Horizon Coatings, which client sets a stricter VOC limit for interior wall paint in the EU?",
-            "For client Aurora Paints, what internal VOC limit in g/L is set for EcoSafe Kitchen & Bath in the EU for typical residential projects?",
-        ]
-        for i, example in enumerate(examples):
-            if st.button(f"Query {i+1}", key=f"example_{i}", help=example):
-                st.session_state.example_query = example
-                st.rerun()
+        tab1, tab2 = st.tabs(["English 🇬🇧", "Multilingual 🌍"])
+
+        with tab1:
+            st.markdown("### Core Questions")
+            st.caption("Click to run these example queries")
+            examples = [
+                "For client Aurora Paints, what is the maximum lead content allowed in EcoSafe Interior Wall Paint for the EU?",
+                "For client Aurora Paints, considering EcoSafe Ceiling Paint, EcoSafe Exterior Facade and EcoShield Floor Coating in the EU, what is the maximum internal VOC limit in g/L across these products?",
+                "According to the guidance for client Horizon Coatings' UltraSafe Interior Wall Paint, in which types of rooms is enhanced ventilation recommended?",
+                "Comparing Aurora Paints and Horizon Coatings, which client sets a stricter VOC limit for interior wall paint in the EU?",
+                "For client Aurora Paints, what internal VOC limit in g/L is set for EcoSafe Kitchen & Bath in the EU for typical residential projects?",
+            ]
+            for i, example in enumerate(examples):
+                if st.button(f"Query {i+1}", key=f"en_example_{i}", help=example):
+                    st.session_state.example_query = example
+                    st.rerun()
+
+        with tab2:
+            st.markdown("### Try in Another Language")
+            st.caption("The system responds in the same language as your query")
+
+            col_a, col_b, col_c = st.columns(3)
+
+            with col_a:
+                st.markdown("#### 🇫🇷 French")
+                french_examples = [
+                    "Pour le client Aurora Paints, quelle est la teneur maximale en plomb autorisée pour la peinture murale intérieure EcoSafe dans l'UE?",
+                    "Comparaison: quel client impose une limite de COV plus stricte pour la peinture murale intérieure dans l'UE?",
+                ]
+                for i, example in enumerate(french_examples):
+                    if st.button(f"French {i+1}", key=f"fr_example_{i}", help=example):
+                        st.session_state.example_query = example
+                        st.rerun()
+
+            with col_b:
+                st.markdown("#### 🇩🇪 German")
+                german_examples = [
+                    "Für den Kunden Aurora Paints, wie hoch ist der maximal zulässige Bleigehalt in der EcoSafe Innenwandfarbe für die EU?",
+                    "Vergleich: Welcher Kunde setzt eine strengere COV-Grenze für Innenwandfarbe in der EU?",
+                ]
+                for i, example in enumerate(german_examples):
+                    if st.button(f"German {i+1}", key=f"de_example_{i}", help=example):
+                        st.session_state.example_query = example
+                        st.rerun()
+
+            with col_c:
+                st.markdown("#### 🇮🇹 Italian")
+                italian_examples = [
+                    "Per il cliente Aurora Paints, qual è il contenuto massimo di piombo consentito nella pittura murale interna EcoSafe per l'UE?",
+                    "Confronto: quale cliente impone un limite di COV più severo per la pittura murale interna nell'UE?",
+                ]
+                for i, example in enumerate(italian_examples):
+                    if st.button(f"Italian {i+1}", key=f"it_example_{i}", help=example):
+                        st.session_state.example_query = example
+                        st.rerun()
 
 
 def _render_clear_button():
