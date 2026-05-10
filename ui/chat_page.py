@@ -164,19 +164,14 @@ def _process_query(user_input: str, workflow):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
-        status_placeholder = st.empty()
-
         try:
             from langchain_core.messages import AIMessage, HumanMessage
             from src.graph.nodes import stream_synthesis, stream_conversational
 
             # Phase 1: Routing & Retrieval with live progress
             retrieval_result, is_conversational = _run_retrieval(
-                user_input, workflow, status_placeholder
+                user_input, workflow
             )
-
-            # Clear status before streaming answer
-            status_placeholder.empty()
 
             # Phase 2: Stream response
             if is_conversational:
@@ -208,38 +203,40 @@ def _process_query(user_input: str, workflow):
                 st.session_state.chat_history = st.session_state.chat_history[-max_window:]
 
         except Exception as e:
-            status_placeholder.empty()
             error_msg = f"An error occurred: {str(e)}"
             st.error(error_msg)
             logger.error(f"Workflow error: {e}", exc_info=True)
             st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
 
-def _run_retrieval(user_input: str, workflow, status_placeholder) -> tuple[dict, bool]:
+def _run_retrieval(user_input: str, workflow) -> tuple[dict, bool]:
     """Execute the LangGraph workflow and stream progress updates."""
     retrieval_result = {}
     is_conversational = False
 
-    for event in workflow.stream(
-        {
-            "query": user_input,
-            "chat_history": st.session_state.chat_history,
-            "session_id": "streamlit_session",
-            "retrieval_trace": [],
-            "retry_count": 0,
-            "needs_fallback": False,
-        },
-        stream_mode="updates",
-    ):
-        for node_name, state_update in event.items():
-            label = _NODE_LABELS.get(node_name, f"{node_name}...")
-            detail = _get_node_detail(node_name, state_update)
+    with st.status("Processing query...", expanded=False) as status:
+        for event in workflow.stream(
+            {
+                "query": user_input,
+                "chat_history": st.session_state.chat_history,
+                "session_id": "streamlit_session",
+                "retrieval_trace": [],
+                "retry_count": 0,
+                "needs_fallback": False,
+            },
+            stream_mode="updates",
+        ):
+            for node_name, state_update in event.items():
+                label = _NODE_LABELS.get(node_name, f"{node_name}...")
+                detail = _get_node_detail(node_name, state_update)
 
-            if node_name == "conversational_responder":
-                is_conversational = True
+                if node_name == "conversational_responder":
+                    is_conversational = True
 
-            status_placeholder.markdown(f"*{label}{detail}*")
-            retrieval_result.update(state_update)
+                status.write(f"{label}{detail}")
+                retrieval_result.update(state_update)
+
+        status.update(label="Retrieval complete", state="complete")
 
     return retrieval_result, is_conversational
 
