@@ -74,10 +74,10 @@ def _render_example_queries():
             st.markdown("### Core Questions")
             st.caption("Click to run these example queries")
             examples = [
-                "For client Aurora Paints, what is the maximum lead content allowed in EcoSafe Interior Wall Paint for the EU?",
+                "For client Aurora Paints, what is the maximum zinc content allowed in the finished EcoSafe Interior Wall Paint for the EU?",
                 "For client Aurora Paints, considering EcoSafe Ceiling Paint, EcoSafe Exterior Facade and EcoShield Floor Coating in the EU, what is the maximum internal VOC limit in g/L across these products?",
-                "According to the guidance for client Horizon Coatings' UltraSafe Interior Wall Paint, in which types of rooms is enhanced ventilation recommended?",
-                "Comparing Aurora Paints and Horizon Coatings, which client sets a stricter VOC limit for interior wall paint in the EU?",
+                "According to the guidance for client Horizon Coatings' UltraSafe Interior Wall Paint, in which types of rooms is enhanced ventilation or longer airing-out periods specifically recommended?",
+                "Comparing client Aurora Paints and client Horizon Coatings, which client sets a stricter VOC limit for interior wall paint in the EU, and what additional usage guidance is mentioned for sensitive environments across their products?",
                 "For client Aurora Paints, what internal VOC limit in g/L is set for EcoSafe Kitchen & Bath in the EU for typical residential projects?",
             ]
             for i, example in enumerate(examples):
